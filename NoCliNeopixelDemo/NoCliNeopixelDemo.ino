@@ -1,23 +1,20 @@
 
 /*
- This is an example of how simple driving a Neopixel can be
- This code is optimized for understandability and changability rather than raw speed
+ This is an example of how to drive a Neopixel string without ever turn off interrupts.
+ It is Written for an Arduino Uno, but could easily be changed for any Arduino or AVR.
  More info at http://wp.josh.com/2014/05/11/ws2812-neopixels-made-easy/
 */
+
+
+// We will be using Output B of Timer2 becuase we must have the clock bits and the force compare bits in a single
+// register that we can write to atomically for our tricks to work.
+
+// OC2B is pin #5 on the ATTMEGA chip which maps to Digital Pin 3 on an Arduino Uno. Connect this pin
+// to the Data In on your NeoPixel string. 
 
 // Change this to be at least as long as your pixel string (too long will work fine, just be a little slower)
 
 #define PIXELS 96*11  // Number of pixels in the string
-
-// These values depend on which pin your string is connected to and what board you are using 
-// More info on how to find these at http://www.arduino.cc/en/Reference/PortManipulation
-
-// These values are for digital pin 8 on an Arduino Yun or digital pin 12 on a DueMilinove/UNO
-// Note that you could also include the DigitalWriteFast header file to not need to to this lookup.
-
-#define PIXEL_PORT  PORTB  // Port of the pin the pixels are connected to
-#define PIXEL_DDR   DDRB   // Port of the pin the pixels are connected to
-#define PIXEL_BIT   4      // Bit of the pin the pixels are connected to
 
 // These are the timing constraints taken mostly from the WS2812 datasheets 
 // These are chosen to be conservative and avoid problems rather than for maximum throughput 
@@ -40,8 +37,79 @@
 
 #define NS_TO_CYCLES(n) ( (n) / NS_PER_CYCLE )
 
-#define DELAY_CYCLES(n) ( ((n)>0) ? __builtin_avr_delay_cycles( n ) :  __builtin_avr_delay_cycles( 0 ) )  // Make sure we never have a delay less than zero
 
+void setupTimer2(void) {
+  
+    // Assume pin 11 is low & input mode on reset
+    // Assume compare output mode is Normal port operation, OC0A disconnected
+    // Assume TCCR2B = 0 on reset
+    // Assume OC2B = 0 on reset
+    
+    
+    // Pull pin low with resistor, then leave pin in input mode and set OC2B to high, then send waveform to off, then enable output- which will show 0 on port, then enable WGN at clock at same write.
+    // Hopefully OC2B will not drive the pullup when high?The general I/O port function is overridden by the Output Compare (OC2x) from the Waveform Generator if
+
+
+    /*
+      either of the COM2x1:0 bits are set. However, the OC2x pin direction (input or output) is still controlled by the
+      Data Direction Register (DDR) for the port pin. The Data Direction Register bit for the OC2x pin (DDR_OC2x)
+      must be set as output before the OC2x value is visible on the pin. The port override function is independent of
+      the Waveform Generation mode
+    */
+        
+    pinMode(3,OUTPUT);      // Pin 3 is the Timer2 output B, but until we enable waveform generation, 
+                            // this will drive pin 11 low based on the current 0 in PORT
+    
+  
+  
+  
+}
+
+
+void sendBit( bool x ) {
+  
+    // Assume pin 11 is setup low & output mode 
+    // Assume compare output mode is Normal port operation, OC0A disconnected
+    // Assume TCCR2B = 0, 
+    // Assume TCNT2 = 0
+    // Assume AOC2B = 0    
+    
+    
+    // First we need to get the OC2B output bit to be a 1    
+    // The DDR is set to input, so nothing we do to OC2B will actually show up on the output pin
+    // Note that we might need pull down resistor attached to the pin to keep it low when the pin is set to input mode
+    
+    // Next match will set the OC2B bit
+    
+    TCCR2A = _BV( COM2B1 ) | _BV( COM2B0) |         // Set OC2B on Compare Match, normal Waveform  generation
+    
+   
+    TCNT2 = 0;      // Start counting at zero
+    OCR2B = 0;      // Make a match
+    
+    TCCR2B = _BV( FOC2B );                // FOC2B: Force Output Compare B. This will set the OC2B output bit to             
+                                          // Note that this would output the 1 on the pin becuase of the COM2 bits, except the pin is currently in input mode 
+
+    TCCR2A = 0;                            // Normal port operation, OC0A disconnected.
+    
+    pinMode( 2 , OUTPUT );                // Pin will now be driven to 0. Ok to switch to output mode becuase COM2B bits are now zero so the OC2B bit is disconnected from the pin. 
+    
+    OCR2B = 10;                           // New match
+    
+    TCCR
+    
+    
+    
+    if (x) {      // We are sending a 1 bit
+      
+      
+      
+    } else       // We are sending a 0 bit
+    
+    }
+    
+    
+  
 
 // Actually send a bit to the string. We turn off optimizations to make sure the compile does
 // not reorder things and make it so the delay happens in the wrong place.
